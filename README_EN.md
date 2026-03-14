@@ -11,153 +11,109 @@ Serverless, fast to deploy, and practical for labs, internal self-service, demos
 
 ### Example 1: Main Interface / Function Demonstration
 ![Homepage Example](img/首页示例.png)
-*Note: This is the default homepage example (invitation code registration interface) displayed to users.
+*Note: This is the minimalist self-service / invitation code registration interface displayed to users.*
 
 ### Example 2: Backend Interface / Management Display
 ![Management Example](img/管理示例.png)
-*Note: This is an example of the management interface, used for managing existing users, global settings, invitation codes, and other functions.
+*Note: This is the management interface, supporting multi-tenant management, user authorization, and a flexible invitation code system.*
 
 ---
 
-## ✨ What’s New (Current Release)
+## 🚀 Complete Rebuild & Enhancements vs. V1
 
-### ✅ Frontend (User Side)
-- Self-service Microsoft 365 user registration
-- Subscription options show remaining quantity, e.g. `E1 (Remaining: 200)`
-- Subscription list automatically sorted by remaining quantity (highest first)
-- **Password policy**: Uppercase / lowercase / numbers / symbols — **3 of 4**, length ≥ 8  
-  - Real-time frontend validation; blocked if invalid (saves compute/API calls)
-- **Reserved/protected usernames are forbidden** (local-part level, e.g. `admin`, `root`)  
-  - Hard-blocked with a strong warning modal
-- Mobile-first UX: no horizontal scrolling, no overflow tables, viewport-safe modals
+Compared to the early version which only provided basic "URL token validation," "single-tenant hardcoded configuration," and "rough interfaces," V3 has undergone a complete, from-the-ground-up rebuild.
+Here are the core additions and major enhancements:
 
-### ✅ Admin Panel
-- Custom admin path (reduce scanning/noise)
-- Admin login with **username + password** (session cookie)
-- “Globals” management (Tenant / Client / Secret / domain / SKU mapping)
-- “Fetch SKU” button becomes available only after TenantId/ClientId/ClientSecret are provided
-- User management: search/pagination/sorting, bulk reset password, bulk delete
-- Invitation codes: generate/export/delete, restrict by Global+SKU, usage limits
-- License view: total/used/remaining; optionally shows subscription lifecycle/expiration date (if permitted)
-- **Protected usernames**: reserved for security; **cannot be registered or deleted** via UI/API
-- Fully responsive UI; modals and toolbars optimized for mobile
+### 🔒 Massive Architecture & Security Upgrades
+- **Completely Ditched Hardcoded Configs**: Added a **Visual First-Time Setup Wizard**. Early versions required you to manually write massive `SKU_MAP` and environment keys in the Cloudflare config page or code. Now, all global accounts, API keys, and sensitive info are entered through an intuitive UI and securely encrypted into Cloudflare KV for persistence.
+- **Replaced Plaintext URL Tokens with High-Spec Session Auth**: The old version allowed forced access to the backend simply by appending `?token=xxx` to the URL, creating huge leak and sniffing risks. The new version switches to secure HttpOnly Cookies to store session keys, and supports an active "Logout" click to destroy credentials, achieving a complete modern login verification loop.
+- **Anti-Probing & Smart Fallback Protection**: Added interception for unauthorized, erroneous requests, or scanning scripts, automatically redirecting them all back to the homepage or throwing a friendly 404 page, completely hiding the real address of the admin backend.
+- **Integrated Anti-Abuse & Risk Constraints**: The frontend natively integrates Cloudflare Turnstile human verification, combined with a high-risk sensitive word dictionary interception mechanism (protecting accounts like `admin`, `root` from being registered or accidentally deleted), fundamentally preventing abuse by malicious scripts.
 
----
+### 🏢 Perfect Support for Multi-Tenant (Multiple Global Accounts)
+- **Visual Multi-Global Management**: Upgraded from only supporting a fixed single tenant to **unlimited multiple global mounts**. You can dynamically add, delete, modify, and query multiple global management credentials (Tenant ID, Client Secret) in the backend, and the system will automatically fetch their corresponding subscription quotas.
+- **Fully Automated Smart SKU Fetching**: No more tedious searching for boring SKU ID mappings in the Graph Explorer! When configuring a new global account, simply click "Fetch SKU", and the system will automatically grab the subscriptions in seconds, displaying automatically matched localized names on the UI.
 
-## 🧩 Legacy vs Current & Migration Guide (Read This)
+### 🛡️ Subscription Isolation & Authorization Control (Core Original Feature)
+- **"Castrated" Distribution Precise to Specific Apps**: The old version could only assign entire SKU authorizations. The new V3 version **pioneers a "Fine-Grained Permission Control" feature**. Whether directly creating an account in the backend or generating an invitation code on the frontend, you can **check and strip out core components that are easily abused by blackhats, such as cloud drives (OneDrive/SharePoint), mail (Exchange), and Teams**, greatly protecting the lifespan of the main tenant!
+- **Smart Invitation Codes with Isolated Scopes**: Rebuilt the invitation code logic. Invitation codes can now accurately restrict to "Only register Subscription B under Global A, and prohibit the use of OneDrive." Supports bulk generation of pure uppercase, unconfusable format invitation codes with fixed prefixes, and visually displays the remaining quota of the invitation code.
 
-This section explains what changed and how to migrate smoothly.
-
-### 1) Configuration model (Legacy env vars → Current KV + setup wizard)
-Legacy versions are typically configured via Workers environment variables like `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `DEFAULT_DOMAIN`, `ADMIN_TOKEN`, `SKU_MAP`, etc.  
-Current version introduces **a setup wizard + KV-based configuration**, which is better for multiple globals, invitations, and settings.
-
-**Migration tips:**
-- If you only have one tenant: create a single Global in the admin panel and copy values from your legacy env vars.
-- If you used `SKU_MAP`: use “Fetch SKU” to rebuild and manage SKU mapping in the admin panel (no need to store large JSON in env vars).
-
-### 2) Admin authentication (Legacy token query → Current username/password login)
-Legacy admin entry is often ` /admin?token=ADMIN_TOKEN `.  
-Current version uses `/{adminPath}/login` with **username + password** and a session cookie.
-
-**Migration tips:**
-- Run the setup wizard once to set admin credentials and admin path.
-- For production environments, consider placing the admin path behind Cloudflare Access or WAF rules.
-
-### 3) Protection rules (Legacy full UPN protection → Current reserved usernames / local-part protection)
-Legacy `HIDDEN_USER` typically protects a full UPN (exact match).  
-Current version standardizes to **reserved usernames** (local-part, e.g. `admin`). This prevents “first deploy got hijacked” scenarios.
-
-**Migration tips:**
-- If you previously protected `admin@tenant.onmicrosoft.com`, add `admin` to the protected username list.
-- If you have multiple domains: local-part protection protects all `admin@*` automatically.
-
-### 4) Subscription UX (Legacy “type only” → Current “remaining + sort”)
-Legacy versions emphasize SKU mapping and license usage queries.  
-Current version shows remaining quantity on the homepage and sorts the list by availability.
-
-**Security note:**
-- Remaining quantity is rendered server-side without exposing admin querying APIs to the frontend.
-
-### 5) Mobile UX (Legacy overflow risk → Current responsive/viewport-safe)
-Current release fixes: overflow tables, oversized modals, huge close buttons, and bulky toolbar layout on mobile.
+### 🧑‍💻 Doubled User Management Experience
+- **High-Performance Frontend & Data Management**: Added multi-combination search conditions and pagination processing in the user management interface (supports fuzzy search and multi-level sorting based on account, username, global affiliation, and owned SKU categories).
+- **Strengthened Password Reset Logic**: Supports batch selecting users to execute operations. When resetting passwords, admins can now choose between "Manual Entry" and "Auto-Generate High-Strength Compliant Password", which better fits operational workflows. The frontend password form also fully implements real-time validation of "3 out of 4 (Upper/Lower/Number/Symbol) and length no less than 8 characters."
 
 ---
 
-## 🛠️ Prerequisites (Kept from Legacy)
+## 🧩 V3 Upgrade & Migration Guide (Read This)
 
-You will need (same as legacy):  
-1. A **Cloudflare account** (Workers + KV / variables)  
-2. **Microsoft 365 Global Admin** privilege (to create an App Registration)  
-3. An **Azure AD / Entra ID App Registration**:
-   - `Client ID`, `Tenant ID`
-   - `Client Secret` (use the Value, not the Secret ID)  
-   - Graph API **Application permissions** + Admin consent  
+If you are upgrading from the early single-file (environment variable configuration) version, please note the following core architectural changes:
 
-> Start with minimal permissions: `User.ReadWrite.All`.  
-> For subscription lifecycle/expiration display you may also need `Directory.Read.All` or `Organization.Read.All`.
+### 1) Configuration Persistence: Changed from Env Vars to Cloudflare KV
+Older versions usually configured large blocks of `SKU_MAP` and `ADMIN_TOKEN` environment variables in `wrangler.toml` or the panel.  
+**The new version introduces `CONFIG_KV`**. All settings (including global accounts, admin paths, anti-abuse keys) are operated in the UI and encrypted/stored in KV.
+> Upgrade Tip: Just keep the basic `CONFIG_KV` binding. You can reconfigure your globals and app mappings through the admin backend, which will be very smooth and supports automatic SKU fetching.
+
+### 2) Access Control: Authentication Upgrade & Anti-Abuse Integration
+The old version directly used plain text URLs with Tokens (like `/?token=xxx`) to access the backend.  
+**The new version uses a secure admin entry path (like `/admin`) to log in**, validating with a username/password and an HttpOnly Session Cookie.  
+> Highly Recommended: Fill in the Cloudflare Turnstile Site Key and Secret Key in the backend settings to enable registration anti-abuse.
+
+### 3) Invitation Codes & Permission Isolation (Major Upgrade)
+Early subscription provisioning often granted all application permissions under that subscription (including OneDrive, Exchange, etc.).  
+**The new version adds a "Disable Application Permissions" feature**. When generating invitation codes or creating accounts directly in the backend, you can check and remove cloud drive and email components that are easily abused by blackhats, protecting the main tenant's security.
+
+### 4) Security Protection: 404 & Smart Redirection Fallbacks
+All frontend inputs now have strict regex validation and error feedback; for all abnormal or probing requests, it automatically redirects back to the login page or throws a clean 404 Not Found interface. A logout button has also been added to the management panel, which upon clicking immediately invalidates the Cookie to prevent browser residue.
 
 ---
 
-## ⚙️ Deploy to Cloudflare Workers (Current)
+## 🛠️ Prerequisites
+
+You will need:  
+1. **Cloudflare Account**: For deploying Workers and binding KV.  
+2. **Microsoft 365 Global Admin Privilege**: To register an Azure AD (Entra ID) application.  
+3. **Azure AD (Entra ID) App Information**:
+   - Get `Client ID`, `Tenant ID`.
+   - Create a `Client Secret` (save its Value).  
+   - Configure Graph API permissions: Add `User.ReadWrite.All`, `Directory.Read.All` (Optional), `Organization.Read.All` (Optional) under **Application permissions**, and execute **Grant admin consent**.  
+
+---
+
+## ⚙️ Cloudflare Workers Deployment Tutorial
 
 ### 1) Create KV Namespace
-Workers → KV → Create namespace  
-Recommended:
-- `CONFIG_KV`
+Go to Cloudflare Dashboard -> Workers & Pages -> KV -> Create namespace  
+Name it: `CONFIG_KV`
 
-### 2) Create/Update Worker
-Paste `worker.js`  script into your Worker and deploy.
+### 2) Create Worker Script
+Create a new Worker, completely copy and paste the contents of the latest `worker_v3.js` (or other main file) from the repository into it.
 
 ### 3) Bind KV
-Worker Settings → Bindings  
-- KV namespace bindings:
-  - `CONFIG_KV`
+In the current Worker's Settings -> Variables & Secrets -> KV Namespace Bindings:
+- Variable name: `CONFIG_KV`
+- KV namespace: Select the KV you just created
 
-### 4) Optional env var (hard “silent protection”)
-- `HIDDEN_USER`: comma-separated **reserved usernames** (local-part only)  
-  - Example: `admin,root,superadmin`
-
-> Legacy releases rely heavily on env vars (e.g. `SKU_MAP`, `ADMIN_TOKEN`, etc.).  
-> Current release recommends managing config in KV via the setup wizard and admin panel.
+### 4) Save and Deploy
+Visit the domain assigned to the Worker (e.g., `xxx.workers.dev`), and it will automatically enter the **First-Time Installation Wizard page**.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (First Experience)
 
-1. Deploy Worker and bind `CONFIG_KV`
-2. Visit your Worker domain to open the setup wizard
-3. Configure:
-   - Admin username
-   - Admin password
-   - Admin path (e.g. `/admin` or `/console`)
-4. Open admin panel → create a Global (Tenant) and fill Tenant/Client/Secret/domain
-5. Click “Fetch SKU” to build SKU mapping
-6. (Optional) Enable invitation-only mode and generate invite codes
-7. Test the homepage registration flow (including on mobile)
-
----
-
-## 📖 Usage
-
-### User Side
-- Visit the homepage
-- Select a subscription (shows remaining; sorted by availability)
-- Enter username & password (3-of-4 rule enforced client-side)
-- Reserved usernames are blocked with a strong warning modal
-
-### Admin Side
-- Visit `https://your-domain/{adminPath}/login`
-- Manage globals, users, invites, settings, and security controls
+1. **Initialize Backend**: Open your domain, set the admin account, password, and your desired backend path (e.g., `/admin-panel`) in the wizard.
+2. **Log into Backend**: Enter using the account you just set up.
+3. **Add Global Account**: Go to "Global Accounts" and fill in the TenantId, ClientId, and ClientSecret information you applied for in Azure.
+4. **Sync SKUs**: After filling in the info, click "Fetch SKU" in the modal. The system will automatically connect to Microsoft to pull your subscription list. Click save.
+5. **Enable Protection (Optional)**: Go to "Settings" to configure Turnstile keys and enable human verification. Enable invitation code mode.
+6. **Distribute & Use**: Go to "Invitation Code Management", generate exclusive invitation codes for specific subscriptions to distribute to users. Users can register instantly by entering them on the homepage!
 
 ---
 
 ## 🧯 Troubleshooting
 
-- **404 on admin pages**: you probably changed the admin path — use the new one
-- **“Fetch SKU” disabled**: ensure TenantId/ClientId/ClientSecret are filled
-- **No subscription expiration date**: permissions likely missing — verify Graph app permissions + Admin consent
-- **Remaining quantity looks stale**: it is server-rendered; switching globals triggers refresh
+- **404 on backend / Cannot enter**: You probably forgot your custom admin path, or the Session expired. Re-enter using the path you set during installation (e.g., `/admin`).
+- **"Fetch SKU" failed**: First check if there are any extra spaces in the TenantId / ClientId / ClientSecret, and whether the correct API permissions were given and **Admin Consent was granted** in Entra ID.
+- **Cannot fetch disableable application services**: Only when selecting a **single** subscription while generating invitation codes or creating accounts in the backend can it correctly match and fetch the Service Plans included under it.
 
 ---
 
@@ -165,7 +121,7 @@ Worker Settings → Bindings
 
 This project is provided as an open-source technical tool. You are responsible for ensuring your deployment and usage comply with applicable laws and the terms/policies of Microsoft, Cloudflare, and any other relevant providers.  
 The authors and contributors are not liable for any direct or indirect damages arising from the use, misuse, or abuse of this project, including account suspension, tenant restrictions, service disruption, data loss, licensing/compliance risks, or legal consequences.  
-If you plan to use it in an organization or commercial context, we recommend performing a security review, applying least-privilege permissions, and protecting admin routes with additional access controls (e.g., Cloudflare Access).
+If you plan to use it in an organization or commercial context, we recommend performing a security review, applying least-privilege permissions, and protecting admin routes with additional access controls.
 
 ---
 
